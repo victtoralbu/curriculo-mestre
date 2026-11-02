@@ -1,0 +1,339 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                             String   @id @default(uuid())
+  name                           String
+  email                          String   @unique
+  password_hash                  String
+  role                           String   @default("USER") // USER | ADMIN
+  status                         String   @default("ACTIVE") // ACTIVE | BLOCKED
+  monthly_contribution_cycle     String?
+  extended_access_until          DateTime?
+  created_at                     DateTime @default(now())
+  updated_at                     DateTime @updatedAt
+
+  profile             ProfessionalProfile?
+  jobs                Job[]
+  applications        Application[]
+  wallet              Wallet?
+  wallet_transactions WalletTransaction[]
+  usage_ledger        UsageLedger[]
+  debts               Debt[]
+  coupon_redemptions  CouponRedemption[]
+  promotional_credits PromotionalCredit[]
+  payments            Payment[]
+  audit_logs          AuditLog[]
+  ai_usage_logs       AiUsageLog[]
+
+  @@index([email])
+  @@index([role, status])
+  @@map("users")
+}
+
+model ProfessionalProfile {
+  id                   String   @id @default(uuid())
+  user_id              String   @unique
+  full_name            String?
+  contact_email        String?
+  phone                String?
+  professional_summary String?
+  target_roles         String?
+  experience_years     String?
+  specialties          String?
+  location             String?
+  linkedin_url         String?
+  portfolio_url        String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  user        User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  experiences ProfessionalExperience[]
+  educations  Education[]
+  skills      Skill[]
+
+  @@map("professional_profiles")
+}
+
+model ProfessionalExperience {
+  id              String   @id @default(uuid())
+  profile_id      String
+  company         String
+  position        String
+  employment_type String?
+  start_date      String
+  end_date        String?
+  description     String
+  achievements    String?
+  tools           String?
+  created_at      DateTime @default(now())
+
+  profile ProfessionalProfile @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@index([profile_id])
+  @@map("professional_experiences")
+}
+
+model Education {
+  id          String   @id @default(uuid())
+  profile_id  String
+  institution String
+  course      String
+  degree      String
+  start_date  String?
+  end_date    String?
+  status      String
+  created_at  DateTime @default(now())
+
+  profile ProfessionalProfile @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@index([profile_id])
+  @@map("educations")
+}
+
+model Skill {
+  id          String   @id @default(uuid())
+  profile_id  String
+  name        String
+  category    String   // TECHNICAL | SOFT | TOOL | LANGUAGE | CERTIFICATION
+  proficiency String?
+  created_at  DateTime @default(now())
+
+  profile ProfessionalProfile @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@index([profile_id])
+  @@map("skills")
+}
+
+model Job {
+  id                     String   @id @default(uuid())
+  user_id                String
+  company                String?
+  position               String
+  description            String
+  source_url             String?
+  extracted_requirements Json
+  created_at             DateTime @default(now())
+
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([user_id, created_at])
+  @@map("jobs")
+}
+
+model Application {
+  id                       String   @id @default(uuid())
+  user_id                  String
+  job_id                   String
+  compatibility_score      Int
+  analysis                 Json
+  resume_content           Json
+  status                   String   @default("CURRICULO_GERADO")
+  usage_transaction_id     String?
+  credit_source            String?
+  ai_input_tokens          Int      @default(0)
+  ai_output_tokens         Int      @default(0)
+  ai_estimated_cost_cents  Int      @default(0)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  job          Job           @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  usage_ledger UsageLedger[]
+  debts        Debt[]
+
+  @@index([user_id, created_at])
+  @@index([status])
+  @@map("applications")
+}
+
+model Wallet {
+  id         String   @id @default(uuid())
+  user_id    String   @unique
+  balance    Int      @default(0) // Em centavos (inteiro)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user         User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id             String   @id @default(uuid())
+  wallet_id      String
+  user_id        String
+  type           String   // CONTRIBUTION | APPLICATION_DEBIT | DEBT_SETTLEMENT | MONTHLY_CONTRIBUTION
+  amount         Int      // Em centavos (positivo ou negativo)
+  description    String
+  reference_type String?
+  reference_id   String?
+  created_at     DateTime @default(now())
+
+  wallet Wallet @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([wallet_id])
+  @@map("wallet_transactions")
+}
+
+model UsageLedger {
+  id              String   @id @default(uuid())
+  user_id         String
+  application_id  String?
+  usage_type      String   // RESUME_GENERATION
+  amount          Int      // Em centavos (0 para gratuito/promo, 10 para adicional/dívida)
+  source          String   // PROMOTIONAL | FREE_QUOTA | MONTHLY_CONTRIBUTION | WALLET_BALANCE | TRUST_DEBT
+  cycle_key       String   // YYYY-MM
+  status          String   @default("CONFIRMED") // CONFIRMED | REVERSED
+  idempotency_key String?  @unique
+  created_at      DateTime @default(now())
+
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, cycle_key, status])
+  @@index([user_id, created_at])
+  @@map("usage_ledger")
+}
+
+model Debt {
+  id               String    @id @default(uuid())
+  user_id          String
+  application_id   String?
+  amount           Int       // Valor original em centavos (ex: 10)
+  remaining_amount Int       // Valor pendente em centavos (permite liquidação parcial ou total)
+  status           String    @default("PENDING") // PENDING | PARTIALLY_SETTLED | SETTLED | CANCELED
+  created_at       DateTime  @default(now())
+  due_at           DateTime
+  settled_at       DateTime?
+
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, status, due_at])
+  @@index([user_id, created_at])
+  @@map("debts")
+}
+
+model Coupon {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  description     String?
+  benefit_type    String    // CREDITS | EXTENDED_ACCESS_DAYS | TEMP_LIMIT_BOOST
+  benefit_value   Int
+  max_redemptions Int
+  max_per_user    Int       @default(1)
+  starts_at       DateTime
+  expires_at      DateTime
+  active          Boolean   @default(true)
+  created_at      DateTime  @default(now())
+
+  redemptions CouponRedemption[]
+
+  @@index([code])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id              String   @id @default(uuid())
+  coupon_id       String
+  user_id         String
+  credits_granted Int
+  created_at      DateTime @default(now())
+
+  coupon Coupon @relation(fields: [coupon_id], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([coupon_id, user_id])
+  @@index([user_id])
+  @@map("coupon_redemptions")
+}
+
+model PromotionalCredit {
+  id               String    @id @default(uuid())
+  user_id          String
+  source           String
+  benefit_type     String    @default("CREDITS")
+  original_amount  Int
+  remaining_amount Int
+  expires_at       DateTime?
+  created_at       DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, remaining_amount])
+  @@map("promotional_credits")
+}
+
+model Payment {
+  id                  String    @id @default(uuid())
+  user_id             String
+  provider            String
+  purpose             String    @default("FREE_CONTRIBUTION") // MONTHLY_CONTRIBUTION | FREE_CONTRIBUTION
+  external_payment_id String    @unique
+  amount              Int       // Em centavos
+  status              String    @default("PENDING") // PENDING | CONFIRMED | FAILED
+  pix_qr_code         String?
+  pix_copy_paste      String?
+  confirmed_at        DateTime?
+  created_at          DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, status])
+  @@index([external_payment_id])
+  @@map("payments")
+}
+
+model SystemSetting {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      Json
+  updated_at DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  actor_user_id String?
+  action        String
+  entity        String
+  entity_id     String?
+  metadata      Json?
+  created_at    DateTime @default(now())
+
+  actor User? @relation(fields: [actor_user_id], references: [id], onDelete: SetNull)
+
+  @@index([entity, entity_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+model AiUsageLog {
+  id                   String   @id @default(uuid())
+  user_id              String
+  application_id       String?
+  operation_type       String   // PROFILE_IMPORT | JOB_ANALYSIS | COMPATIBILITY | RESUME_GENERATION | TEXT_REVIEW
+  model                String
+  input_tokens         Int
+  output_tokens        Int
+  estimated_cost_cents Int      // Custo estimado em centavos (mínimo 1 centavo ou acumulado proporcional)
+  estimated_cost_usd   Float    @default(0)
+  created_at           DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@map("ai_usage_logs")
+}

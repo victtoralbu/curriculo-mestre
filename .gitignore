@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.vitest-Output/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Environment variables & secrets (NEVER COMMIT)
+.env
+.env.*
+!.env.example
+
+# Local database / temporary storage
+.pglite/
+storage/private/*
+!storage/private/.gitkeep
+
+# Debug & OS
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.pem
+Thumbs.db
+*.tsbuildinfo
+next-env.d.ts

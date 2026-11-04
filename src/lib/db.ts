@@ -73,15 +73,23 @@ async function getPGlite(): Promise<PGlite> {
 }
 
 async function runRawMigrationAndSeed(execSql: (sql: string) => Promise<void>, client: DbClient) {
-  const migrationPath = path.join(
-    process.cwd(),
-    'prisma',
-    'migrations',
-    '20261102000000_init',
-    'migration.sql'
-  );
-  const ddl = fs.readFileSync(migrationPath, 'utf-8');
-  await execSql(ddl);
+  const migrationFiles = [
+    path.join(process.cwd(), 'prisma', 'migrations', '20261102000000_init', 'migration.sql'),
+    path.join(
+      process.cwd(),
+      'prisma',
+      'migrations',
+      '20261104000000_conversational_onboarding',
+      'migration.sql'
+    ),
+  ];
+
+  for (const migrationPath of migrationFiles) {
+    if (fs.existsSync(migrationPath)) {
+      const ddl = fs.readFileSync(migrationPath, 'utf-8');
+      await execSql(ddl);
+    }
+  }
 
   // Seed default commercial settings if not exists
   const existingSettings = await client.query<{ id: string }>(
@@ -300,6 +308,9 @@ export const db = {
     const pglite = await getPGlite();
     await pglite.exec(`
       TRUNCATE TABLE
+        chat_messages,
+        chat_conversations,
+        uploaded_resumes,
         ai_usage_logs,
         audit_logs,
         payments,

@@ -29,7 +29,7 @@ export default function RegisterPage() {
         setError(data.error?.message || 'Erro ao criar sua conta.');
         return;
       }
-      router.push('/dashboard');
+      router.push('/onboarding');
     } catch {
       setError('Falha ao conectar ao servidor. Tente novamente.');
     } finally {

@@ -31,6 +31,9 @@ model User {
   payments            Payment[]
   audit_logs          AuditLog[]
   ai_usage_logs       AiUsageLog[]
+  uploaded_resumes    UploadedResume[]
+  chat_conversations  ChatConversation[]
+  chat_messages       ChatMessage[]
 
   @@index([email])
   @@index([role, status])
@@ -50,6 +53,11 @@ model ProfessionalProfile {
   location             String?
   linkedin_url         String?
   portfolio_url        String?
+  onboarding_state     String   @default("welcome")
+  onboarding_completed Boolean  @default(false)
+  section_states       Json     @default("{}")
+  extracted_draft      Json     @default("{}")
+  master_resume        Json     @default("{}")
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 
@@ -148,6 +156,7 @@ model Application {
   job          Job           @relation(fields: [job_id], references: [id], onDelete: Cascade)
   usage_ledger UsageLedger[]
   debts        Debt[]
+  conversations ChatConversation[]
 
   @@index([user_id, created_at])
   @@index([status])
@@ -336,4 +345,55 @@ model AiUsageLog {
 
   @@index([user_id, created_at])
   @@map("ai_usage_logs")
+}
+
+model UploadedResume {
+  id             String   @id @default(uuid())
+  user_id        String
+  file_name      String
+  mime_type      String
+  file_size      Int
+  extracted_text String
+  parsed_data    Json     @default("{}")
+  created_at     DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@map("uploaded_resumes")
+}
+
+model ChatConversation {
+  id             String   @id @default(uuid())
+  user_id        String
+  context_type   String   @default("ONBOARDING") // ONBOARDING | APPLICATION
+  flow_state     String   @default("welcome")
+  application_id String?
+  metadata       Json     @default("{}")
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  user        User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  application Application?  @relation(fields: [application_id], references: [id], onDelete: SetNull)
+  messages    ChatMessage[]
+
+  @@index([user_id, context_type, updated_at])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id              String   @id @default(uuid())
+  conversation_id String
+  user_id         String
+  role            String   // assistant | user | system
+  content         String
+  metadata        Json     @default("{}")
+  created_at      DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@index([user_id, created_at])
+  @@map("chat_messages")
 }

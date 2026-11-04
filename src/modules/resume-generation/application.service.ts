@@ -44,6 +44,7 @@ export const createApplicationSchema = z.object({
   jobDescription: z.string().trim().optional().default(''),
   sourceUrl: z.string().trim().optional().nullable(),
   idempotencyKey: z.string().trim().optional(),
+  additionalConfirmedSkills: z.array(z.string()).optional().default([]),
 });
 
 export interface ApplicationDetail {
@@ -80,17 +81,37 @@ export async function createApplicationAndGenerateResume(params: {
     );
   }
 
-  const { company, position, sourceUrl, idempotencyKey } = parsed.data;
+  const {
+    company,
+    position,
+    sourceUrl,
+    idempotencyKey,
+    additionalConfirmedSkills,
+  } = parsed.data;
   let jobDescription = parsed.data.jobDescription;
   const referenceDate = params.referenceDate || new Date();
 
   // 1. Verificar se o usuário possui perfil profissional preenchido
-  const profile = await getOrCreateProfileByUserId(params.userId);
-  if (!profile.isComplete) {
+  const baseProfile = await getOrCreateProfileByUserId(params.userId);
+  if (!baseProfile.isComplete) {
     throw new ValidationError(
       'Seu perfil profissional ainda está incompleto. Cadastre seu resumo/objetivo e ao menos uma experiência, formação ou competência antes de gerar um currículo personalizado.'
     );
   }
+
+  // Clonar perfil em memória caso o usuário tenha confirmado competências adicionais na conversa desta candidatura, preservando o Currículo Mestre original intacto!
+  const profile = {
+    ...baseProfile,
+    skills: [
+      ...baseProfile.skills,
+      ...(additionalConfirmedSkills || []).map((name) => ({
+        id: randomUUID(),
+        name,
+        category: 'TECHNICAL' as const,
+        proficiency: 'Confirmado para a vaga',
+      })),
+    ],
+  };
 
   // 2. Pré-verificação de disponibilidade de créditos antes de acionar a IA
   const preCheck = await evaluateCreditAvailability(

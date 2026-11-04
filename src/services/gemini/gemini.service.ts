@@ -791,26 +791,285 @@ ${cleaned.slice(0, 10000)}
     };
   } catch {
     const emailMatch = cleaned.match(/[\w.-]+@[\w.-]+\.\w+/);
-    const phoneMatch = cleaned.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}[-\s]?\d{4}/);
-    const linkedinMatch = cleaned.match(/https?:\/\/(?:www\.)?linkedin\.com\/in\/[^\s)]+/i);
+    const phoneMatch = cleaned.match(
+      /(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}[-\s]?\d{4}/
+    );
+    const linkedinMatch = cleaned.match(
+      /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[^\s|,;)]+/i
+    );
+    const githubOrPortfolioMatch = cleaned.match(
+      /(?:https?:\/\/)?(?:www\.)?(?:github\.com|gitlab\.com|behance\.net|portfolio\.)[^\s|,;)]+/i
+    );
+    const locationMatch =
+      cleaned.match(
+        /([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-Za-zÀ-ú]+){0,3}\s*[-/•]\s*(?:AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO))\b/
+      ) ||
+      cleaned.match(/(?:Cidade|Localização|Endereço)\s*:\s*([^\r\n|]+)/i);
+
     const lines = cleaned
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean);
 
+    const experiences: Array<{
+      company: string;
+      position: string;
+      start_date: string;
+      end_date?: string | null;
+      description: string;
+      achievements?: string | null;
+      tools?: string | null;
+    }> = [];
+
+    const educations: Array<{
+      institution: string;
+      course: string;
+      degree: string;
+      status: string;
+    }> = [];
+
+    const skills: Array<{
+      name: string;
+      category: 'TECHNICAL' | 'SOFT' | 'TOOL' | 'LANGUAGE' | 'CERTIFICATION';
+    }> = [];
+
+    // Parse experiences in pattern "Cargo — Empresa (Período)" or "Cargo - Empresa (Período)" or "Empresa: X | Cargo: Y"
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const expHeaderMatch = line.match(
+        /^([^—\-|()]{3,60})\s*[—-]\s*([^()]{2,60})\s*\(([^)]+)\)$/
+      );
+      if (
+        expHeaderMatch &&
+        !/graduação|bacharelado|tecnólogo|licenciatura|mba|pós-graduação|ensino/i.test(
+          line
+        )
+      ) {
+        const position = expHeaderMatch[1].trim();
+        const company = expHeaderMatch[2].trim();
+        const periodRaw = expHeaderMatch[3].trim();
+        const [startPart, endPart] = periodRaw.split(/\s*[-–a]\s*/i);
+
+        const descLines: string[] = [];
+        let tools: string | null = null;
+        let achievements: string | null = null;
+        let j = i + 1;
+        while (j < lines.length && j <= i + 6) {
+          const nextL = lines[j];
+          if (
+            /^(EXPERIÊNCIA|FORMAÇÃO|COMPETÊNCIAS|IDIOMAS|EDUCAÇÃO|RESUMO)/i.test(
+              nextL
+            ) ||
+            /^([^—\-|()]{3,60})\s*[—-]\s*([^()]{2,60})\s*\(([^)]+)\)$/.test(
+              nextL
+            )
+          ) {
+            break;
+          }
+          if (/^Ferramentas(?:\s+e\s+tecnologias)?\s*:/i.test(nextL)) {
+            tools = nextL.replace(/^Ferramentas(?:\s+e\s+tecnologias)?\s*:/i, '').trim();
+          } else if (/^Resultados(?:\s+declarados|\s+e\s+conquistas)?\s*:/i.test(nextL)) {
+            achievements = nextL
+              .replace(/^Resultados(?:\s+declarados|\s+e\s+conquistas)?\s*:/i, '')
+              .trim();
+          } else {
+            descLines.push(nextL.replace(/^[-•*]\s*/, '').trim());
+          }
+          j++;
+        }
+
+        experiences.push({
+          company,
+          position,
+          start_date: startPart || '2022',
+          end_date: endPart || 'Atual',
+          description:
+            descLines.join(' ') || `Atuação como ${position} na ${company}.`,
+          achievements,
+          tools,
+        });
+      }
+
+      // Parse education lines like "Bacharelado em Sistemas de Informação — USP (2019 - 2022 • Concluído)"
+      const eduMatch = line.match(
+        /^((?:Bacharelado|Graduação|Tecnólogo|Licenciatura|Pós-graduação|MBA|Mestrado|Doutorado|Técnico|Ensino Médio)[^—\-]*?)\s+em\s+([^—\-()]+?)\s*[—-]\s*([^()]+?)(?:\s*\(([^)]+)\))?$/i
+      );
+      if (eduMatch) {
+        const degree = eduMatch[1].trim();
+        const course = eduMatch[2].trim();
+        const institution = eduMatch[3].trim();
+        const periodStatus = eduMatch[4] || '';
+        const isStudying = /cursando|andamento/i.test(periodStatus || line);
+        educations.push({
+          institution,
+          course,
+          degree,
+          status: isStudying ? 'Cursando' : 'Concluído',
+        });
+      }
+    }
+
+    // Fallback education detection if written in simpler format
+    if (educations.length === 0) {
+      for (const line of lines) {
+        if (
+          /(?:Universidade|Faculdade|Instituto|FATEC|USP|UNICAMP|UFRJ|UFMG|PUC|SENAI|FIAP|Estácio|UNIP|Anhanguera|Mackenzie)/i.test(
+            line
+          ) &&
+          line.length < 140
+        ) {
+          const parts = line.split(/[—\-•|]/).map((p) => p.trim()).filter(Boolean);
+          educations.push({
+            institution: parts[parts.length - 1] || line,
+            course: parts[0] || 'Formação Superior',
+            degree: /técnico/i.test(line)
+              ? 'Técnico'
+              : /pós|mba/i.test(line)
+                ? 'Pós-graduação'
+                : 'Graduação',
+            status: /cursando|andamento/i.test(line) ? 'Cursando' : 'Concluído',
+          });
+          break;
+        }
+      }
+    }
+
+    // Extract labeled skill groups if present
+    for (const line of lines) {
+      if (/^Competências Técnicas\s*:/i.test(line)) {
+        const items = line
+          .replace(/^Competências Técnicas\s*:/i, '')
+          .split(/[,;]/)
+          .map((s) => s.replace(/\([^)]*\)/g, '').trim())
+          .filter(Boolean);
+        items.forEach((name) => skills.push({ name, category: 'TECHNICAL' }));
+      } else if (/^Ferramentas(?:\s+e\s+Tecnologias)?\s*:/i.test(line)) {
+        const items = line
+          .replace(/^Ferramentas(?:\s+e\s+Tecnologias)?\s*:/i, '')
+          .split(/[,;]/)
+          .map((s) => s.replace(/\([^)]*\)/g, '').trim())
+          .filter(Boolean);
+        items.forEach((name) => skills.push({ name, category: 'TOOL' }));
+      } else if (/^Competências Comportamentais\s*:/i.test(line)) {
+        const items = line
+          .replace(/^Competências Comportamentais\s*:/i, '')
+          .split(/[,;]/)
+          .map((s) => s.replace(/\([^)]*\)/g, '').trim())
+          .filter(Boolean);
+        items.forEach((name) => skills.push({ name, category: 'SOFT' }));
+      } else if (/^Idiomas\s*:/i.test(line)) {
+        const items = line
+          .replace(/^Idiomas\s*:/i, '')
+          .split(/[,;]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        items.forEach((name) => skills.push({ name, category: 'LANGUAGE' }));
+      } else if (/^Certificações\s*:/i.test(line)) {
+        const items = line
+          .replace(/^Certificações\s*:/i, '')
+          .split(/[,;]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        items.forEach((name) =>
+          skills.push({ name, category: 'CERTIFICATION' })
+        );
+      }
+    }
+
+    // Also scan common skills/tools/languages mentioned in the resume text if not already captured
+    const knownTechAndDomain = [
+      { name: 'TypeScript', category: 'TECHNICAL' as const },
+      { name: 'JavaScript', category: 'TECHNICAL' as const },
+      { name: 'React', category: 'TECHNICAL' as const },
+      { name: 'Next.js', category: 'TECHNICAL' as const },
+      { name: 'Node.js', category: 'TECHNICAL' as const },
+      { name: 'Python', category: 'TECHNICAL' as const },
+      { name: 'PostgreSQL', category: 'TECHNICAL' as const },
+      { name: 'SQL', category: 'TECHNICAL' as const },
+      { name: 'Customer Success', category: 'TECHNICAL' as const },
+      { name: 'Gestão de Operações', category: 'TECHNICAL' as const },
+      { name: 'Implantação de Sistemas', category: 'TECHNICAL' as const },
+      { name: 'Gestão de Projetos', category: 'TECHNICAL' as const },
+      { name: 'Análise de Dados', category: 'TECHNICAL' as const },
+      { name: 'Atendimento ao Cliente', category: 'TECHNICAL' as const },
+      { name: 'CRM', category: 'TOOL' as const },
+      { name: 'HubSpot', category: 'TOOL' as const },
+      { name: 'Salesforce', category: 'TOOL' as const },
+      { name: 'Excel', category: 'TOOL' as const },
+      { name: 'Power BI', category: 'TOOL' as const },
+      { name: 'Docker', category: 'TOOL' as const },
+      { name: 'Git', category: 'TOOL' as const },
+      { name: 'AWS', category: 'TOOL' as const },
+      { name: 'Inglês', category: 'LANGUAGE' as const },
+      { name: 'Espanhol', category: 'LANGUAGE' as const },
+    ];
+
+    for (const item of knownTechAndDomain) {
+      if (
+        cleaned.toLowerCase().includes(item.name.toLowerCase()) &&
+        !skills.some((s) => s.name.toLowerCase().includes(item.name.toLowerCase()))
+      ) {
+        skills.push(item);
+      }
+    }
+
+    // Identify target_roles and summary from the top lines
+    const fullName = lines[0]?.slice(0, 80) || null;
+    let targetRoles: string | null = null;
+    if (
+      lines[1] &&
+      !lines[1].includes('@') &&
+      !lines[1].includes('|') &&
+      lines[1].length < 80 &&
+      !/^(RESUMO|EXPERIÊNCIA|FORMAÇÃO|DADOS)/i.test(lines[1])
+    ) {
+      targetRoles = lines[1];
+    } else if (experiences.length > 0) {
+      targetRoles = experiences[0].position;
+    }
+
+    let summaryText: string | null = null;
+    const summaryHeaderIdx = lines.findIndex((l) =>
+      /^RESUMO(?:\s+PROFISSIONAL)?$/i.test(l)
+    );
+    if (summaryHeaderIdx !== -1 && lines[summaryHeaderIdx + 1]) {
+      summaryText = lines[summaryHeaderIdx + 1];
+    } else {
+      const candidateLines = lines
+        .slice(1, 5)
+        .filter(
+          (l) =>
+            !l.includes('@') &&
+            !l.includes('|') &&
+            !/^(RESUMO|EXPERIÊNCIA|FORMAÇÃO|COMPETÊNCIAS)/i.test(l) &&
+            l.length > 35
+        );
+      if (candidateLines.length > 0) {
+        summaryText = candidateLines.join(' ').slice(0, 500);
+      }
+    }
+
     return {
       suggestedProfile: {
-        full_name: lines[0]?.slice(0, 80) || null,
+        full_name: fullName,
         contact_email: emailMatch ? emailMatch[0] : null,
         phone: phoneMatch ? phoneMatch[0] : null,
-        location: null,
-        linkedin_url: linkedinMatch ? linkedinMatch[0] : null,
-        portfolio_url: null,
-        professional_summary: lines.slice(1, 4).join(' ').slice(0, 500) || null,
-        target_roles: null,
-        experiences: [],
-        educations: [],
-        skills: [],
+        location: locationMatch ? locationMatch[1].trim() : null,
+        linkedin_url: linkedinMatch
+          ? linkedinMatch[0].startsWith('http')
+            ? linkedinMatch[0]
+            : `https://${linkedinMatch[0]}`
+          : null,
+        portfolio_url: githubOrPortfolioMatch
+          ? githubOrPortfolioMatch[0].startsWith('http')
+            ? githubOrPortfolioMatch[0]
+            : `https://${githubOrPortfolioMatch[0]}`
+          : null,
+        professional_summary: summaryText,
+        target_roles: targetRoles,
+        experiences,
+        educations,
+        skills,
       },
     };
   }

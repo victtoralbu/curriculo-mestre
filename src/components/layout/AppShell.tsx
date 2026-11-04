@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  Sparkles,
   Ticket,
   Trash2,
   UserCheck,
@@ -33,14 +34,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [deletingLgpd, setDeletingLgpd] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(async (res) => {
-        if (!res.ok) {
+    Promise.all([fetch('/api/auth/me'), fetch('/api/profile')])
+      .then(async ([meRes, profRes]) => {
+        if (!meRes.ok) {
           router.replace('/login');
           return;
         }
-        const data = await res.json();
-        setUser(data.user);
+        const meData = await meRes.json();
+        setUser(meData.user);
+
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          if (
+            meData.user?.role !== 'ADMIN' &&
+            profData.profile &&
+            !profData.profile.isComplete
+          ) {
+            router.replace('/onboarding');
+            return;
+          }
+        }
       })
       .catch(() => {
         router.replace('/login');
@@ -74,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/dashboard', label: 'Início', icon: LayoutDashboard },
+    { href: '/onboarding', label: 'Consultora IA', icon: Sparkles },
     { href: '/profile', label: 'Perfil', icon: UserCheck },
     { href: '/applications/new', label: 'Nova Vaga', icon: FilePlus2 },
     { href: '/history', label: 'Histórico', icon: History },

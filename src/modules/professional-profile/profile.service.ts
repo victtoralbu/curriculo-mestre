@@ -3,11 +3,13 @@ import { db } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { recordAuditLog } from '@/modules/administration/audit.service';
 import {
+  DEFAULT_SECTION_STATES,
   EducationItem,
   educationSchema,
   ExperienceItem,
   experienceSchema,
   FullProfessionalProfile,
+  ProfileSectionStates,
   SkillItem,
   skillSchema,
   updateProfileSchema,
@@ -26,6 +28,11 @@ interface ProfileRow {
   location: string | null;
   linkedin_url: string | null;
   portfolio_url: string | null;
+  onboarding_state?: string;
+  onboarding_completed?: boolean;
+  section_states?: ProfileSectionStates;
+  extracted_draft?: Record<string, unknown>;
+  master_resume?: Record<string, unknown>;
 }
 
 export async function getOrCreateProfileByUserId(
@@ -83,14 +90,30 @@ export async function getOrCreateProfileByUserId(
     ),
   ]);
 
-  const isComplete = Boolean(
+  const hasMinimumData = Boolean(
     profile.full_name &&
       (profile.professional_summary || profile.target_roles) &&
       (expRes.rows.length > 0 || eduRes.rows.length > 0 || skillRes.rows.length > 0)
   );
 
+  const isInActiveIncompleteOnboarding =
+    profile.onboarding_state &&
+    profile.onboarding_state !== 'welcome' &&
+    profile.onboarding_state !== 'master_completed' &&
+    !profile.onboarding_completed;
+
+  const isComplete = Boolean(
+    profile.onboarding_completed ||
+      (hasMinimumData && !isInActiveIncompleteOnboarding)
+  );
+
   return {
     ...profile,
+    onboarding_state: profile.onboarding_state || (isComplete ? 'master_completed' : 'welcome'),
+    onboarding_completed: Boolean(profile.onboarding_completed || isComplete),
+    section_states: profile.section_states || DEFAULT_SECTION_STATES,
+    extracted_draft: profile.extracted_draft || {},
+    master_resume: profile.master_resume || {},
     experiences: expRes.rows,
     educations: eduRes.rows,
     skills: skillRes.rows,
@@ -242,7 +265,36 @@ export async function saveFullProfessionalProfile(
     );
   });
 
-  return getOrCreateProfileByUserId(userId);
+  const updated = await getOrCreateProfileByUserId(userId);
+  if (
+    updated.full_name &&
+    (updated.professional_summary || updated.target_roles) &&
+    (updated.experiences.length > 0 ||
+      updated.educations.length > 0 ||
+      updated.skills.length > 0)
+  ) {
+    const completedSections: ProfileSectionStates = {
+      personal: 'completed',
+      positioning: 'completed',
+      summary: 'completed',
+      experiences: 'completed',
+      education: 'completed',
+      skills: 'completed',
+      languages: 'completed',
+    };
+    await db.query(
+      `UPDATE professional_profiles
+       SET onboarding_completed = true,
+           onboarding_state = 'master_completed',
+           section_states = $1::jsonb,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [JSON.stringify(completedSections), current.id]
+    );
+    return getOrCreateProfileByUserId(userId);
+  }
+
+  return updated;
 }
 
 export async function addExperienceItem(

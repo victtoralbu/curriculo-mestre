@@ -27,6 +27,14 @@ export default function LoginPage() {
         setError(data.error?.message || 'Erro ao realizar login.');
         return;
       }
+      const profRes = await fetch('/api/profile');
+      if (profRes.ok) {
+        const profData = await profRes.json();
+        if (profData.profile && !profData.profile.isComplete) {
+          router.push('/onboarding');
+          return;
+        }
+      }
       router.push('/dashboard');
     } catch {
       setError('Falha de comunicação com o servidor. Tente novamente.');

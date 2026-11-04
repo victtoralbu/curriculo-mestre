@@ -49,6 +49,28 @@ export type ExperienceItem = z.infer<typeof experienceSchema> & { id: string };
 export type EducationItem = z.infer<typeof educationSchema> & { id: string };
 export type SkillItem = z.infer<typeof skillSchema> & { id: string };
 
+export type SectionProgressStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface ProfileSectionStates {
+  personal: SectionProgressStatus;
+  positioning: SectionProgressStatus;
+  summary: SectionProgressStatus;
+  experiences: SectionProgressStatus;
+  education: SectionProgressStatus;
+  skills: SectionProgressStatus;
+  languages: SectionProgressStatus;
+}
+
+export const DEFAULT_SECTION_STATES: ProfileSectionStates = {
+  personal: 'pending',
+  positioning: 'pending',
+  summary: 'pending',
+  experiences: 'pending',
+  education: 'pending',
+  skills: 'pending',
+  languages: 'pending',
+};
+
 export interface FullProfessionalProfile {
   id: string;
   user_id: string;
@@ -62,6 +84,11 @@ export interface FullProfessionalProfile {
   location: string | null;
   linkedin_url: string | null;
   portfolio_url: string | null;
+  onboarding_state?: string;
+  onboarding_completed?: boolean;
+  section_states?: ProfileSectionStates;
+  extracted_draft?: Record<string, unknown>;
+  master_resume?: Record<string, unknown>;
   experiences: ExperienceItem[];
   educations: EducationItem[];
   skills: SkillItem[];

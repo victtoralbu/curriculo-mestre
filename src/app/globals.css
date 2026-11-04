@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --cm-teal: #306D64;
+  --cm-pine: #04332D;
+  --cm-obsidian: #040606;
+  --cm-mahogany: #4C1507;
+  --cm-terracotta: #B53F0D;
+  --cm-ochre: #D77428;
+}
+
 @layer base {
   html {
     font-family: var(--font-roboto), 'Roboto', system-ui, -apple-system, sans-serif;
@@ -9,7 +18,9 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden min-h-screen;
+    background-color: #F5F7F6;
+    color: #040606;
+    @apply font-sans antialiased overflow-x-hidden min-h-screen;
   }
 
   /* Evita zoom automático no iOS em inputs no mobile-first */

@@ -14,7 +14,7 @@ import { FullProfessionalProfile } from '@/modules/professional-profile/profile.
 import { GeneratedResumeContent } from '@/services/gemini/gemini.schemas';
 
 /**
- * Gera um arquivo DOCX de coluna única 100% compatível com sistemas ATS e padronizado com fonte Roboto
+ * Gera um arquivo DOCX de coluna única 100% compatível com sistemas ATS e padronizado com fonte Inter
  */
 export async function generateResumeDocxBuffer(
   resume: GeneratedResumeContent
@@ -31,7 +31,7 @@ export async function generateResumeDocxBuffer(
           text: resume.header.fullName,
           bold: true,
           size: 32,
-          font: 'Roboto',
+          font: 'Inter',
         }),
       ],
     })
@@ -47,7 +47,7 @@ export async function generateResumeDocxBuffer(
           bold: true,
           size: 24,
           color: '306D64',
-          font: 'Roboto',
+          font: 'Inter',
         }),
       ],
     })
@@ -71,7 +71,7 @@ export async function generateResumeDocxBuffer(
             text: contactParts.join('  |  '),
             size: 20,
             color: '04332D',
-            font: 'Roboto',
+            font: 'Inter',
           }),
         ],
       })
@@ -96,7 +96,7 @@ export async function generateResumeDocxBuffer(
             bold: true,
             size: 22,
             color: '04332D',
-            font: 'Roboto',
+            font: 'Inter',
           }),
         ],
       })
@@ -113,7 +113,7 @@ export async function generateResumeDocxBuffer(
           new TextRun({
             text: resume.professionalSummary,
             size: 21,
-            font: 'Roboto',
+            font: 'Inter',
           }),
         ],
       })
@@ -132,13 +132,13 @@ export async function generateResumeDocxBuffer(
               text: `${exp.position} — ${exp.company}`,
               bold: true,
               size: 22,
-              font: 'Roboto',
+              font: 'Inter',
             }),
             new TextRun({
               text: `   (${exp.period})`,
               size: 20,
               color: '4B5563',
-              font: 'Roboto',
+              font: 'Inter',
             }),
           ],
         })
@@ -153,7 +153,7 @@ export async function generateResumeDocxBuffer(
               new TextRun({
                 text: bullet,
                 size: 20,
-                font: 'Roboto',
+                font: 'Inter',
               }),
             ],
           })
@@ -170,7 +170,7 @@ export async function generateResumeDocxBuffer(
                 italics: true,
                 size: 19,
                 color: '475569',
-                font: 'Roboto',
+                font: 'Inter',
               }),
             ],
           })
@@ -191,13 +191,13 @@ export async function generateResumeDocxBuffer(
               text: `${edu.degree} em ${edu.course} — ${edu.institution}`,
               bold: true,
               size: 21,
-              font: 'Roboto',
+              font: 'Inter',
             }),
             new TextRun({
               text: `  (${edu.period} • ${edu.status})`,
               size: 20,
               color: '4B5563',
-              font: 'Roboto',
+              font: 'Inter',
             }),
           ],
         })
@@ -234,12 +234,12 @@ export async function generateResumeDocxBuffer(
                 text: `${group.label}: `,
                 bold: true,
                 size: 20,
-                font: 'Roboto',
+                font: 'Inter',
               }),
               new TextRun({
                 text: group.items.join(', '),
                 size: 20,
-                font: 'Roboto',
+                font: 'Inter',
               }),
             ],
           })

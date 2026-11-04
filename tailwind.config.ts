@@ -19,8 +19,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-roboto)', 'Roboto', 'system-ui', '-apple-system', 'sans-serif'],
-        roboto: ['var(--font-roboto)', 'Roboto', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        inter: ['var(--font-inter)', 'Inter', 'sans-serif'],
+        roboto: ['var(--font-inter)', 'Inter', 'sans-serif'],
       },
       colors: {
         palette: {

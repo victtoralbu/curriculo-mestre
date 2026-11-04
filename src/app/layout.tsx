@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import { Roboto } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 
-const roboto = Roboto({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
-  variable: '--font-roboto',
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-inter',
   display: 'swap',
 });
 
@@ -28,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={roboto.variable}>
-      <body className="font-roboto bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+    <html lang="pt-BR" className={inter.variable}>
+      <body className="font-sans bg-slate-50 text-slate-900 min-h-screen flex flex-col">
         {children}
       </body>
     </html>
